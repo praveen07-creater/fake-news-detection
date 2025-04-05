@@ -21,7 +21,7 @@ Misinformation and fake news are growing challenges in today’s digital world. 
 - **Confusion Matrix:** Also generated
 
 ## 🎥 Demo Video
-[👉 Watch Demo on YouTube](https://your-youtube-link-here)
+[👉 Watch Demo on YouTube](https://youtu.be/X2YQUC0qONA)
 
 ## 📝 How to Run
 1. Clone the repo:
