@@ -3,44 +3,29 @@ import pandas as pd
 import requests
 from io import StringIO
 
-st.title("📰 Fake News Detection")
+# Use your working Google Drive file URL
+fake_url = "https://drive.google.com/uc?export=download&id=1F3Sws07czVN63gkDRDdzu3p_jrzozO4e"
 
-# Google Drive File IDs
-FAKE_ID = "1F3Sws07czVN63gkDRDdzu3p_jrzozO4e"
-TRUE_ID = "1BMK4RzPxXK6EtFeDlq1j5G0keV_HpQIE"
-
-# Convert Google Drive ID to direct download URL
-def get_drive_url(file_id):
-    return f"https://drive.google.com/uc?export=download&id={file_id}"
-
-# Download and read CSV
-@st.cache_data
-def load_csv_from_drive(file_id):
-    download_url = get_drive_url(file_id)
-    response = requests.get(download_url)
+def load_csv_from_drive(drive_url):
+    response = requests.get(drive_url)
     if response.status_code != 200:
-        st.error(f"Failed to download file from Google Drive. Status code: {response.status_code}")
-        return pd.DataFrame()
-
-    # Try reading the CSV data
+        st.error(f"❌ Failed to download file. Status code: {response.status_code}")
+        return None
     try:
         csv_data = StringIO(response.text)
-        df = pd.read_csv(csv_data)
-        return df
+        return pd.read_csv(csv_data)
     except Exception as e:
-        st.error(f"Error reading CSV: {e}")
-        return pd.DataFrame()
+        st.error(f"❌ Error reading CSV: {e}")
+        return None
 
-# Load both datasets
-fake = load_csv_from_drive(FAKE_ID)
-true = load_csv_from_drive(TRUE_ID)
+st.set_page_config(page_title="Fake News Viewer", layout="wide")
+st.title("📰 Fake News Detection Dataset Viewer")
 
-# Display some preview
-if not fake.empty and not true.empty:
-    st.subheader("📊 Sample Fake News")
-    st.write(fake.head())
+# Load only fake.csv from your link
+fake_df = load_csv_from_drive(fake_url)
 
-    st.subheader("📊 Sample True News")
-    st.write(true.head())
+if fake_df is not None:
+    st.success("✅ Fake News Dataset Loaded Successfully!")
+    st.dataframe(fake_df.head())
 else:
-    st.error("Failed to load one or both CSV files. Please check your file permissions or link.")
+    st.warning("⚠️ Could not load the dataset. Please check the file format and sharing settings.")
