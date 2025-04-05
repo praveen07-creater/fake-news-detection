@@ -1,31 +1,33 @@
 import streamlit as st
 import pandas as pd
-import requests
-from io import StringIO
 
-# Use your working Google Drive file URL
-fake_url = "https://drive.google.com/uc?export=download&id=1F3Sws07czVN63gkDRDdzu3p_jrzozO4e"
+st.set_page_config(page_title="Fake News Detection", layout="wide")
+st.title("📰 Fake News Detection Dataset Viewer")
 
-def load_csv_from_drive(drive_url):
-    response = requests.get(drive_url)
-    if response.status_code != 200:
-        st.error(f"❌ Failed to download file. Status code: {response.status_code}")
-        return None
+# Google Drive direct CSV URLs
+true_url = "https://drive.google.com/uc?export=download&id=1q6B_iSEivL2JwKJX14ZQPUH6MmLJ9l6i"
+fake_url = "https://drive.google.com/uc?export=download&id=1ZNFliz7vxLePuJIA48-Hoc3C7m9byoGt"
+
+# Load CSVs with error handling
+@st.cache_data
+def load_data(url):
     try:
-        csv_data = StringIO(response.text)
-        return pd.read_csv(csv_data)
+        df = pd.read_csv(url)
+        return df
     except Exception as e:
         st.error(f"❌ Error reading CSV: {e}")
         return None
 
-st.set_page_config(page_title="Fake News Viewer", layout="wide")
-st.title("📰 Fake News Detection Dataset Viewer")
+true_df = load_data(true_url)
+fake_df = load_data(fake_url)
 
-# Load only fake.csv from your link
-fake_df = load_csv_from_drive(fake_url)
-
-if fake_df is not None:
-    st.success("✅ Fake News Dataset Loaded Successfully!")
-    st.dataframe(fake_df.head())
+if true_df is not None and fake_df is not None:
+    st.success("✅ Datasets loaded successfully!")
+    
+    st.subheader("✅ True News Sample")
+    st.dataframe(true_df.head(10), use_container_width=True)
+    
+    st.subheader("🚫 Fake News Sample")
+    st.dataframe(fake_df.head(10), use_container_width=True)
 else:
-    st.warning("⚠️ Could not load the dataset. Please check the file format and sharing settings.")
+    st.warning("⚠️ Could not load the datasets. Please check file format and sharing settings.")
