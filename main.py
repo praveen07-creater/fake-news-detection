@@ -1,83 +1,68 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
-import nltk
+import re
 import string
-import requests
-from io import StringIO
-from sklearn.model_selection import train_test_split
+import nltk
+import gdown
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 
-# Download NLTK data
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 
-# Preprocessing function
-def preprocess_text(text):
-    text = text.lower()
-    text = "".join([char for char in text if char not in string.punctuation])
-    tokens = text.split()
-    tokens = [word for word in tokens if word not in stopwords.words("english")]
-    return " ".join(tokens)
+# --- Google Drive CSV Download ---
+fake_url = 'https://drive.google.com/uc?id=1rHy90tgqmnXnZk7fJzM0nNSuBpWi-ANy'
+true_url = 'https://drive.google.com/uc?id=1F3Sws07czVN63gkDRDdzu3p_jrzozO4e'
 
-# Function to read Google Drive files
-def read_drive_csv(share_link):
-    file_id = share_link.split("/d/")[1].split("/")[0]
-    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    response = requests.get(download_url)
-    return pd.read_csv(StringIO(response.text))
+gdown.download(fake_url, 'Fake.csv', quiet=False)
+gdown.download(true_url, 'True.csv', quiet=False)
 
-# Load the data from Google Drive
-fake_url = "https://drive.google.com/file/d/1rHy90tgqmnXnZk7fJzM0nNSuBpWi-ANy/view?usp=drive_link"
-true_url = "https://drive.google.com/file/d/1F3Sws07czVN63gkDRDdzu3p_jrzozO4e/view?usp=drive_link"
+# --- Read CSVs ---
+fake = pd.read_csv('Fake.csv')
+true = pd.read_csv('True.csv')
 
-fake = read_drive_csv(fake_url)
-true = read_drive_csv(true_url)
-
-# Add labels
-fake["label"] = 0
-true["label"] = 1
-
-# Combine and shuffle
+# --- Preprocess ---
+fake['label'] = 0
+true['label'] = 1
 data = pd.concat([fake, true], axis=0)
-data = data.sample(frac=1).reset_index(drop=True)
+data.reset_index(drop=True, inplace=True)
 
-# Preprocess text
-data["text"] = data["text"].apply(preprocess_text)
+stop_words = set(stopwords.words('english'))
 
-# Split data
-X = data["text"]
-y = data["label"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(f"[{string.punctuation}]", "", text)
+    words = text.split()
+    words = [word for word in words if word not in stop_words]
+    return " ".join(words)
 
-# Vectorization
+data['text'] = data['text'].apply(clean_text)
+
+X = data['text']
+y = data['label']
+
 vectorizer = TfidfVectorizer()
-X_train_vec = vectorizer.fit_transform(X_train)
-X_test_vec = vectorizer.transform(X_test)
+X_vec = vectorizer.fit_transform(X)
 
-# Model
-model = PassiveAggressiveClassifier(max_iter=1000)
-model.fit(X_train_vec, y_train)
+X_train, X_test, y_train, y_test = train_test_split(X_vec, y, test_size=0.2, random_state=42)
 
-# Evaluate
-acc = accuracy_score(y_test, model.predict(X_test_vec))
+model = PassiveAggressiveClassifier()
+model.fit(X_train, y_train)
 
-# Streamlit App
+# --- Streamlit UI ---
 st.title("📰 Fake News Detection App")
-st.markdown(f"**Model Accuracy:** {acc * 100:.2f}%")
 
-user_input = st.text_area("Enter a news article text to verify:")
+user_input = st.text_area("Enter News Text to Check:")
 
-if st.button("Predict"):
-    if user_input.strip() != "":
-        processed_input = preprocess_text(user_input)
-        input_vec = vectorizer.transform([processed_input])
-        prediction = model.predict(input_vec)[0]
-        label = "🟢 Real News" if prediction == 1 else "🔴 Fake News"
-        st.success(f"Prediction: {label}")
+if st.button("Check"):
+    cleaned_input = clean_text(user_input)
+    input_vec = vectorizer.transform([cleaned_input])
+    prediction = model.predict(input_vec)
+
+    if prediction[0] == 0:
+        st.error("❌ This news seems **Fake**.")
     else:
-        st.warning("Please enter some news content first.")
+        st.success("✅ This news seems **Real**.")
