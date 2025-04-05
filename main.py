@@ -1,65 +1,75 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import gdown
 import nltk
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from sklearn.model_selection import train_test_split
+import requests
+from io import StringIO
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+import re
+import string
 
-# Download datasets from Google Drive
-fake_url = 'https://drive.google.com/uc?id=1rHy90tgqmnXnZk7fJzM0nNSuBpWi-ANy'
-true_url = 'https://drive.google.com/uc?id=1F3Sws07czVN63gkDRDdzu3p_jrzozO4e'
+nltk.download('stopwords')
 
-gdown.download(fake_url, 'Fake.csv', quiet=False)
-gdown.download(true_url, 'True.csv', quiet=False)
+# 🔽 Google Drive CSV Links (Exportable)
+fake_url = "https://drive.google.com/uc?export=download&id=1rHy90tgqmnXnZk7fJzM0nNSuBpWi-ANy"
+true_url = "https://drive.google.com/uc?export=download&id=1F3Sws07czVN63gkDRDdzu3p_jrzozO4e"
 
-# Load datasets
-fake = pd.read_csv("Fake.csv")
-true = pd.read_csv("True.csv")
+# 🔽 Load files using requests
+def load_csv_from_drive(url):
+    response = requests.get(url)
+    csv_data = StringIO(response.text)
+    return pd.read_csv(csv_data)
 
-# Add labels
+fake = load_csv_from_drive(fake_url)
+true = load_csv_from_drive(true_url)
+
+# 🔽 Labeling and combining
 fake["label"] = 0
 true["label"] = 1
-
-# Combine and shuffle
 data = pd.concat([fake, true], axis=0)
 data = data.drop(['title', 'subject', 'date'], axis=1)
 data = data.sample(frac=1)
 
-# Preprocessing
-nltk.download('stopwords')
+# 🔽 Preprocessing
 ps = PorterStemmer()
+stop_words = stopwords.words('english')
 
-def stemming(content):
-    content = content.lower()
-    content = content.split()
-    content = [ps.stem(word) for word in content if word not in stopwords.words('english')]
-    return " ".join(content)
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(f"[{string.punctuation}]", "", text)
+    words = text.split()
+    words = [ps.stem(word) for word in words if word not in stop_words]
+    return " ".join(words)
 
-data['text'] = data['text'].apply(stemming)
+data["text"] = data["text"].apply(clean_text)
 
-# Train-test split
-X = data['text']
-y = data['label']
+# 🔽 Split and train
+X = data["text"]
+y = data["label"]
 vectorizer = TfidfVectorizer()
-X_vectorized = vectorizer.fit_transform(X)
-X_train, X_test, y_train, y_test = train_test_split(X_vectorized, y, test_size=0.2)
+X_vec = vectorizer.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X_vec, y, test_size=0.2)
 
 model = LogisticRegression()
 model.fit(X_train, y_train)
-accuracy = accuracy_score(y_test, model.predict(X_test))
+acc = accuracy_score(y_test, model.predict(X_test))
 
-# Streamlit App
+# 🔽 Streamlit UI
 st.title("📰 Fake News Detection App")
-st.write(f"Model Accuracy: **{accuracy * 100:.2f}%**")
+st.write(f"🔍 **Model Accuracy**: {acc * 100:.2f}%")
 
-user_input = st.text_area("Enter the news article text:")
-if st.button("Check if it's Fake or Real"):
-    transformed_input = vectorizer.transform([stemming(user_input)])
-    prediction = model.predict(transformed_input)
-    result = "✅ Real News" if prediction[0] == 1 else "❌ Fake News"
-    st.subheader(result)
+user_input = st.text_area("Enter a news article to check if it's fake or real:")
+
+if st.button("Check"):
+    input_cleaned = clean_text(user_input)
+    input_vectorized = vectorizer.transform([input_cleaned])
+    prediction = model.predict(input_vectorized)[0]
+    if prediction == 1:
+        st.success("✅ This looks like **Real News**.")
+    else:
+        st.error("🚫 This seems like **Fake News**.")
