@@ -18,8 +18,10 @@ def load_data(url):
         st.error(f"❌ Error reading CSV: {e}")
         return None
 
-true_df = load_data(true_url)
-fake_df = load_data(fake_url)
+
+true_df = pd.read_csv("true_clean.csv")
+fake_df = pd.read_csv("fake_clean.csv")
+
 
 if true_df is not None and fake_df is not None:
     st.success("✅ Datasets loaded successfully!")
